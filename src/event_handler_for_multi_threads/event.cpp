@@ -5,13 +5,19 @@
 #include "event.hpp"
 
 
+namespace Event_Mutex
+{
+    std::mutex mtx;
+}
+
+
 void Event_queue::poll_events()
 {
     SDL_Event event;
     // SDL_PollEvent renvoie 1 si un événement est disponible et le met dans 'event'
     if (SDL_PollEvent(&event)) {
         // Verrouille le mutex pour protéger l'accès aux données partagées
-        std::unique_lock<std::mutex> lock(Holy_Mutex::mtx);
+        std::unique_lock<std::mutex> lock(Event_Mutex::mtx);
         // Met à jour le dernier événement et indique qu'un nouvel événement est disponible
         last_event = event;
         new_event_available = true;
@@ -25,7 +31,7 @@ void Event_queue::poll_events()
 void Event_queue::get_event(SDL_Event* event, bool &quit)
 {
     // Verrouille le mutex pour protéger l'accès aux données partagées
-    std::unique_lock<std::mutex> lock(Holy_Mutex::mtx);
+    std::unique_lock<std::mutex> lock(Event_Mutex::mtx);
     // Attend qu'un nouvel événement soit disponible ou que le programme soit en train de se terminer
     while (!new_event_available && !quit)
     {
@@ -44,7 +50,7 @@ void Event_queue::get_event(SDL_Event* event, bool &quit)
 
 void Event_queue::notify_all() {
     // Verrouille le mutex pour protéger l'accès aux données partagées
-    std::unique_lock<std::mutex> lock(Holy_Mutex::mtx);
+    std::unique_lock<std::mutex> lock(Event_Mutex::mtx);
     // Indique qu'un nouvel événement est disponible
     new_event_available = true;
     // Notifie tous les threads en attente qu'un nouvel événement est disponible

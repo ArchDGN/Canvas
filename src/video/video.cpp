@@ -4,6 +4,15 @@
 
 #include "video.hpp"
 
+#include <utility>
+
+
+namespace Video_Mutex
+{
+    std::mutex mtx;
+}
+
+
 Video::Video(SDL_Renderer *renderer) : m_renderer(renderer) {}
 
 
@@ -46,8 +55,8 @@ bool Video::load_video_with_id(const std::string &id, const std::string &path, S
     // On initialise le contexte avec les valeurs passées en paramètres
     // id pour l'identifiant de la vidéo
     context->id = std::make_unique<std::string>(id);
-    // rect pour la position et la taille de la vidéo
-    context->rect = std::make_unique<SDL_Rect>(rect);
+    // path pour le chemin de la vidéo
+    context->path = std::make_unique<std::string>(path);
     // mutex pour protéger les données de la vidéo
     context->mutex = std::unique_ptr<SDL_mutex, std::function<void(SDL_mutex *)>>(SDL_CreateMutex(), SDL_DestroyMutex);
 
@@ -92,9 +101,14 @@ bool Video::load_video_with_id(const std::string &id, const std::string &path, S
     context->mp = std::unique_ptr<libvlc_media_player_t, std::function<void(libvlc_media_player_t *)>>(
             libvlc_media_player_new_from_media(m), libvlc_media_player_release
     );
+
     libvlc_media_tracks_release(tracks, num_tracks);
     libvlc_media_release(m);
 
+    // src_rect pour la taille de la vidéo
+    context->src_rect = std::make_unique<SDL_Rect>(SDL_Rect{0, 0, static_cast<int>(w), static_cast<int>(h)});
+    // dst_rect pour la position et la taille de la vidéo
+    context->dst_rect = std::make_unique<SDL_Rect>((rect.w == 0 || rect.h == 0) ? SDL_Rect{0, 0, static_cast<int>(w), static_cast<int>(h)} : rect);
     // On crée une texture pour la vidéo
     context->texture = std::unique_ptr<SDL_Texture, std::function<void(SDL_Texture *)>>(
             SDL_CreateTexture(
@@ -120,7 +134,7 @@ bool Video::load_video_with_id(const std::string &id, const std::string &path, S
 
     {
         // On protège la liste des vidéos
-        std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+        std::lock_guard<std::mutex> lock(Video_Mutex::mtx);
         size_t size = m_loaded_videos.size();
         // On ajoute la vidéo à la liste
         m_loaded_videos.push_back(std::move(context));
@@ -132,6 +146,11 @@ bool Video::load_video_with_id(const std::string &id, const std::string &path, S
         }
         return false;
     }
+}
+
+bool Video::load_video_with_id(const std::string &id, const std::string &path, std::vector<std::string> vec)
+{
+    return load_video_with_id(id, path, {0, 0, 0, 0}, std::move(vec));
 }
 
 
@@ -169,21 +188,38 @@ void Video::unlock(void *data, [[maybe_unused]] void *id, [[maybe_unused]] void 
 
     // Ici on peut aussi dessiner des trucs.
     // On peut edit les pixels de la vidéo
+    /*auto *pixels = (uint16_t *)*p_pixels;
+    int total_pixels = c->src_rect->w * c->src_rect->h;
 
-    /*uint16_t *pixels = (uint16_t *)*p_pixels;
+    // Créer un nouveau tableau pour stocker la copie des pixels
+    auto* copied_pixels = new uint16_t[total_pixels];
+    memset(copied_pixels, 0, total_pixels * sizeof(uint16_t));
 
-    // We can also render stuff.
-    int x, y;
-    for(y = 10; y < 40; y++) {
-        for(x = 10; x < 40; x++) {
-            if(x < 13 || y < 13 || x > 36 || y > 36) {
-                pixels[y * VIDEOWIDTH + x] = 0xffff;
-            } else {
-                // RV16 = 5+6+5 pixels per color, BGR.
-                pixels[y * VIDEOWIDTH + x] = 0x02ff;
+    double radians = *c->angle * M_PI / 180.0;
+
+    int srcCenterX = c->src_rect->w / 2;
+    int srcCenterY = c->src_rect->h / 2;
+
+    for (int y = 0; y < c->src_rect->h; ++y) {
+        for (int x = 0; x < c->src_rect->w; ++x) {
+            // Position relative au centre de l'image source
+            int relX = x - srcCenterX;
+            int relY = y - srcCenterY;
+
+            // Appliquer la rotation
+            int newX = (int)(relX * cos(radians) - relY * sin(radians)) + srcCenterX;
+            int newY = (int)(relX * sin(radians) + relY * cos(radians)) + srcCenterY;
+
+            // Vérifier les bornes de la nouvelle image
+            if (newX >= 0 && newX < c->src_rect->w && newY >= 0 && newY < c->src_rect->h) {
+                copied_pixels[newY * c->src_rect->w + newX] = pixels[y * c->src_rect->w + x];
             }
         }
-    }*/
+    }
+    // Copier les pixels modifiés dans la texture
+    memcpy(pixels, copied_pixels, total_pixels * sizeof(uint16_t));
+
+    delete[] copied_pixels;*/
 
     // On unlock la texture
     SDL_UnlockTexture(c->texture.get());
@@ -201,7 +237,7 @@ void Video::display_video_all_video()
     for (auto &video : m_loaded_videos)
     {
         SDL_LockMutex(video->mutex.get());
-        SDL_RenderCopy(m_renderer, video->texture.get(), nullptr, video->rect.get());
+        SDL_RenderCopy(m_renderer, video->texture.get(), video->src_rect.get(), video->dst_rect.get());
         SDL_UnlockMutex(video->mutex.get());
     }
 }
@@ -217,13 +253,14 @@ void Video::stop_all_video()
 
 bool Video::edit_video_with_id(const std::string &id, SDL_Rect rect)
 {
+
     // On édite la vidéo avec l'identifiant id
     for (auto &video : m_loaded_videos)
     {
         if (*video->id == id)
         {
             SDL_LockMutex(video->mutex.get());
-            *video->rect = rect;
+            *video->dst_rect = rect;
             SDL_UnlockMutex(video->mutex.get());
 
             return true;
@@ -231,5 +268,27 @@ bool Video::edit_video_with_id(const std::string &id, SDL_Rect rect)
     }
 
     return false;
+}
+
+
+bool Video::delete_video_with_id(const std::string &id)
+{
+    // On supprime la vidéo avec l'identifiant id
+    for (auto it = m_loaded_videos.begin(); it != m_loaded_videos.end(); ++it)
+    {
+        if (*(*it)->id == id)
+        {
+            libvlc_media_player_stop((*it)->mp.get());
+            m_loaded_videos.erase(it);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+uint32_t Video::get_number_of_video()
+{
+    return static_cast<uint32_t>(m_loaded_videos.size());
 }
 

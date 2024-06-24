@@ -9,6 +9,12 @@
 #include <utility>
 
 
+namespace Button_Mutex
+{
+    std::mutex mtx;
+}
+
+
 Buttons::Buttons(std::unique_ptr<Mouse> *mouse, int *window_width, int *window_height)
 {
     m_window_width = window_width;
@@ -29,7 +35,7 @@ bool Buttons::create_button_by_id(std::string id, int x, int y, int w, int h, st
     button.pointer_to_function = std::move(pointer_to_function);
 
     {
-        std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+        std::lock_guard<std::mutex> lock(Button_Mutex::mtx);
         size_t size = m_button_list.size();
         m_button_list.push_back(button);
         size_t new_size = m_button_list.size();
@@ -47,7 +53,7 @@ bool Buttons::edit_button_by_id(const std::string& id, int x, int y, int w, int 
 {
     // Modification des boutons avec les parametres suivants donnés par l'utilisateur
     // On parcourt la liste des boutons et on modifie celui qui a le meme id que celui donné par l'utilisateur
-    std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+    std::lock_guard<std::mutex> lock(Button_Mutex::mtx);
     for (auto &i : m_button_list)
     {
         if (i.id == id)
@@ -69,7 +75,7 @@ bool Buttons::edit_button_by_id(const std::string& id, int x, int y, int w, int 
 bool Buttons::delete_button_by_id(const std::string& id)
 {
     // Suppression des boutons avec les parametres suivants donnés par l'utilisateur
-    std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+    std::lock_guard<std::mutex> lock(Button_Mutex::mtx);
     size_t size = m_button_list.size();
     m_button_list.erase(std::remove_if(m_button_list.begin(), m_button_list.end(), [id](Button &i){return i.id == id;}), m_button_list.end());
     size_t new_size = m_button_list.size();
@@ -87,7 +93,7 @@ Buttons::Button* Buttons::return_button_by_id(const std::string& id)
 {
     // Retourne le bouton avec l'id donné par l'utilisateur
     // On parcourt la liste des boutons et on retourne celui qui a le meme id que celui donné par l'utilisateur
-    std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+    std::lock_guard<std::mutex> lock(Button_Mutex::mtx);
     for (auto &i : m_button_list)
     {
         if (i.id == id)
@@ -123,7 +129,7 @@ bool Buttons::check_all_buttons_clicked()
         return false;
     }
     // On vérifie si un bouton a été cliqué
-    std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+    std::lock_guard<std::mutex> lock(Button_Mutex::mtx);
     for (auto &i : m_button_list)
     {
         if (is_button_clicked(&i))
@@ -138,6 +144,6 @@ bool Buttons::check_all_buttons_clicked()
 
 int Buttons::return_button_list_size() const {
     // On retourne la taille de la liste des boutons
-    std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+    std::lock_guard<std::mutex> lock(Button_Mutex::mtx);
     return int(m_button_list.size());
 }

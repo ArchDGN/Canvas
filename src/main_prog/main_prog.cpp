@@ -6,11 +6,10 @@
 
 
 // Le Saint Mutex protège les variables partagées entre les threads
-namespace Holy_Mutex
+namespace Quit_Mutex
 {
     std::mutex mtx;
 }
-
 
 namespace Mein_canvas {
 
@@ -21,24 +20,42 @@ namespace Mein_canvas {
         set_up_main_workers();
 
         // Exemple de chargement de vidéo
-        m_video->load_video_with_id("video", "b.mp4", {0, 0, *m_window_width/2, *m_window_height/2}, {"--no-xlib", "--no-audio"});
-        /*m_video->load_video_with_id("video1", "c.mp4", {0, *m_window_height/2, *m_window_width/2, *m_window_height/2});
-        m_video->load_video_with_id("video3", "d.mkv", {*m_window_width/2, 0, *m_window_width/2, *m_window_height/2});
-        m_video->load_video_with_id("video4", "e.mkv", {*m_window_width/2, *m_window_height/2, *m_window_width/2, *m_window_height/2});*/
+        m_video->load_video_with_id("video", "b.mp4", {"--no-xlib", "--no-audio"});
+
+        bool clicked = false;
+        m_button_control->create_button_by_id("button", 0, 0, 100, 100, [this, &clicked]() {
+            if (clicked)
+                return;
+
+            // Buffer pour stocker le nom du thread
+            char thread_name[16]; // La taille maximale du nom du thread est de 16 caractères sous Linux
+
+            // Obtenir le nom du thread
+            if(pthread_getname_np(pthread_self(), thread_name, sizeof(thread_name)) == 0) {
+                std::cout << "Executed in thread: " << thread_name << std::endl;
+            } else {
+                std::cout << "Failed to get thread name" << std::endl;
+            }
+            m_video->edit_video_with_id("video", {0, 0, *m_window_width / 2, *m_window_height / 2});
+            std::cout << m_video->get_number_of_video() << std::endl;
+            m_video->load_video_with_id("video2", "e.mkv");
+            std::cout << m_video->get_number_of_video() << std::endl;
+            m_video->edit_video_with_id("video2", {*m_window_width / 2, *m_window_height / 2, *m_window_width / 2, *m_window_height / 2});
+
+            clicked = true;
+        });
 
         // Boucle principale, on limite le nombre d'itérations par seconde a 120
         limit_fps_of(m_quit, 120.0, [this]() {
             if (m_event.type == SDL_QUIT)
             {
-                std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+                std::lock_guard<std::mutex> lock(Quit_Mutex::mtx);
                 m_quit = true;
             } else {
                 SDL_GetWindowSize(m_prog_window, m_window_width, m_window_height);
             }
 
             SDL_RenderClear(m_renderer);
-
-            m_video->edit_video_with_id("video", {0, 0, *m_window_width, *m_window_height});
 
             // On affiche les vidéos
             m_video->display_video_all_video();

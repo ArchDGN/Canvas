@@ -10,10 +10,6 @@
 #include <string>
 #include <mutex>
 
-namespace Holy_Mutex
-{
-    extern std::mutex mtx;
-}
 
 struct Data
 {
@@ -39,5 +35,27 @@ public:
     Color(int r, int g, int b) : r(r), g(g), b(b) {}
 
 };
+
+
+namespace Quit_Mutex
+{
+    extern std::mutex mtx;
+}
+namespace Threads_Mutex
+{
+    extern std::mutex mtx;
+}
+namespace Video_Mutex
+{
+    extern std::mutex mtx;
+}
+namespace Event_Mutex
+{
+    extern std::mutex mtx;
+}
+namespace Button_Mutex
+{
+    extern std::mutex mtx;
+}
 
 #endif //MEINCANVAS_DATA_HPP

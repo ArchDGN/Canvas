@@ -5,10 +5,16 @@
 #include "threads_workers.hpp"
 
 
+namespace Threads_Mutex
+{
+    std::mutex mtx;
+}
+
+
 void ThreadsWorkers::create_worker_by_id(const std::string &id, std::function<void()> work, bool can_be_run, bool self_destruct)
 {
     // On verrouille l'accès à m_workers
-    std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+    std::lock_guard<std::mutex> lock(Threads_Mutex::mtx);
     // On ajoute un nouveau worker avec son id, son travail, et s'il peut être exécuté
     m_workers.push_back(std::move(std::make_unique<Workers>(Workers{id, false, can_be_run, self_destruct, std::move(work)})));
 }
@@ -56,7 +62,7 @@ void ThreadsWorkers::remove_finished_threads() // Cette fonction supprime les th
 {
     std::vector<std::string> keys_to_remove;
     {
-        std::lock_guard<std::mutex> lock(Holy_Mutex::mtx); // Verrouiller l'accès à m_futures_map
+        std::lock_guard<std::mutex> lock(Threads_Mutex::mtx); // Verrouiller l'accès à m_futures_map
         for (auto &thread: m_futures_map)
         {
             // Si le thread est terminé, on le marque pour suppression
@@ -71,7 +77,7 @@ void ThreadsWorkers::remove_finished_threads() // Cette fonction supprime les th
     for (const auto &key : keys_to_remove) {
         {
             // On verrouille l'accès à m_futures_map
-            std::lock_guard<std::mutex> lock(Holy_Mutex::mtx); // Verrouiller l'accès à m_futures_map
+            std::lock_guard<std::mutex> lock(Threads_Mutex::mtx); // Verrouiller l'accès à m_futures_map
             m_futures_map.erase(key);
         }
 
@@ -109,28 +115,28 @@ void ThreadsWorkers::set_working_status()
 void ThreadsWorkers::delete_worker_by_id(const std::string &id)
 {
     // On verrouille l'accès à m_workers et on supprime le worker avec l'id correspondant
-    std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+    std::lock_guard<std::mutex> lock(Threads_Mutex::mtx);
     m_workers.erase(std::remove_if(m_workers.begin(), m_workers.end(), [id](const std::unique_ptr<Workers>& worker){return worker->id == id;}), m_workers.end());
 }
 
 unsigned int ThreadsWorkers::return_workers_size() const
 {
     // On verrouille l'accès à m_workers et on retourne la taille de m_workers
-    std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+    std::lock_guard<std::mutex> lock(Threads_Mutex::mtx);
     return m_workers.size();
 }
 
 unsigned int ThreadsWorkers::numbers_of_running_workers() const
 {
     // On verrouille l'accès à m_workers et on retourne le nombre de workers en train de travailler
-    std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+    std::lock_guard<std::mutex> lock(Threads_Mutex::mtx);
     return std::count_if(m_workers.begin(), m_workers.end(), [](const std::unique_ptr<Workers>& worker){return worker->working;});
 }
 
 bool ThreadsWorkers::can_worker_be_self_destruct(const std::string& id) const
 {
     // On verrouille l'accès à m_workers et on retourne si le worker avec l'id correspondant peut être détruita
-    std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+    std::lock_guard<std::mutex> lock(Threads_Mutex::mtx);
     auto it = std::find_if(m_workers.begin(), m_workers.end(), [&id](const std::unique_ptr<Workers>& worker){return worker->id == id;});
     return it != m_workers.end() && (*it)->self_destruct;
 }
@@ -138,7 +144,7 @@ bool ThreadsWorkers::can_worker_be_self_destruct(const std::string& id) const
 void ThreadsWorkers::edit_worker_by_id(const std::string &id, bool can_be_run, bool self_destruct)
 {
     // On verrouille l'accès à m_workers et on modifie les paramètres du worker avec l'id correspondant
-    std::lock_guard<std::mutex> lock(Holy_Mutex::mtx);
+    std::lock_guard<std::mutex> lock(Threads_Mutex::mtx);
     auto it = std::find_if(m_workers.begin(), m_workers.end(), [&id](const std::unique_ptr<Workers>& worker){return worker->id == id;});
     if (it != m_workers.end()) {
         (*it)->can_be_run = can_be_run;

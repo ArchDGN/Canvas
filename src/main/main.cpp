@@ -6,10 +6,8 @@
 
 // Commande ./prog > /dev/null 2>&1 pour ne pas afficher les messages de VLC
 
-int main() {
+int main()
+{
     Mein_canvas::Main_prog mp;
     mp.run();
 }
-
-
-
